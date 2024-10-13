@@ -8,7 +8,6 @@ const QuizPage: NextPage = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  // const [timeLeft, setTimeLeft] = useState(3600); // 1 hour in seconds
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [answerStatus, setAnswerStatus] = useState<string | null>(null); // "correct" | "incorrect"
@@ -34,18 +33,18 @@ const QuizPage: NextPage = () => {
         ...prevAnswers,
         [currentQuestionIndex]: selectedLabel,
       };
-      console.log("New answers after selection:", newAnswers);
       localStorage.setItem("quizAnswers", JSON.stringify(newAnswers));
       return newAnswers;
     });
 
     const currentQuestion = questions[currentQuestionIndex];
-    if (selectedLabel === currentQuestion.correctAnswer) {
+    if (currentQuestion && selectedLabel === currentQuestion.correctAnswer) {
       setAnswerStatus("correct");
     } else {
       setAnswerStatus("incorrect");
     }
   };
+
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -61,104 +60,92 @@ const QuizPage: NextPage = () => {
         "https://pacmann-frontend.pacmann.workers.dev"
       );
       const data = await response.json();
-      setQuestions(data.data); // Adjust this according to your API response structure
+      setQuestions(data.data);
     } catch (error) {
       console.error("Error fetching questions:", error);
     } finally {
-      setIsLoading(false); // Set loading to false after fetching is complete
+      setIsLoading(false); 
     }
   };
 
   const [userName, setUserName] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    const loadSavedData = () => {
-      const savedUserName = localStorage.getItem("userName");
-      if (!savedUserName) {
-        router.push('/login');
-        return;
-      }
-      setUserName(savedUserName);
-
-      const savedAnswers = localStorage.getItem("quizAnswers");
-      const savedTime = localStorage.getItem("timeLeft");
-      const savedSubmitStatus = localStorage.getItem("isQuizSubmitted");
-
-      console.log("Loading saved data:", { savedAnswers, savedTime, savedSubmitStatus });
-
-      if (savedAnswers) {
-        setAnswers(JSON.parse(savedAnswers));
-      }
-
-      if (savedTime) {
-        setTimeLeft(Number(savedTime));
-      } else {
-        const initialTime = 3600; // 1 hour in seconds
-        setTimeLeft(initialTime);
-        localStorage.setItem("timeLeft", initialTime.toString());
-      }
-
-      if (savedSubmitStatus) {
-        setIsQuizSubmitted(JSON.parse(savedSubmitStatus));
-      }
-    };
-
-    loadSavedData();
-    fetchQuestions();
-  }, [router]);
-
-  localStorage.setItem('test', 'test');
-  console.log(localStorage.getItem('test'));
-
-  useEffect(() => {
-    if (Object.keys(answers).length > 0) {
-      console.log("Saving answers to localStorage:", answers);
-      localStorage.setItem("quizAnswers", JSON.stringify(answers));
-    }
-  }, [answers]);
-
-  useEffect(() => {
-    console.log("Saving answers to localStorage:", answers);
-    localStorage.setItem("quizAnswers", JSON.stringify(answers));
-    localStorage.setItem("timeLeft", timeLeft.toString());
-    localStorage.setItem("isQuizSubmitted", JSON.stringify(isQuizSubmitted));
-  }, [answers, timeLeft, isQuizSubmitted]);
-
-  // Load time from localStorage on mount
-  useEffect(() => {
-    const savedTime = localStorage.getItem("timeLeft");
-    if (savedTime) {
-      setTimeLeft(Number(savedTime));
-    }
-  }, []);
-  // Timer untuk menghitung mundur
-  useEffect(() => {
-    if (timeLeft === null) return; 
-
-    const interval = setInterval(() => {
-      setTimeLeft((prevTime) => {
-        if (prevTime <= 0 || isQuizSubmitted) {
-          clearInterval(interval);
-          return prevTime; // Tidak perlu decrement jika kuis disubmit atau waktu habis
-        }
-        const newTime = prevTime - 1;
-        localStorage.setItem("timeLeft", newTime.toString()); // Simpan waktu ke localStorage
-        return newTime;
-      });
-    }, 1000);
-
-    const handleLogout = () => {
+  const loadSavedData = () => {
+    const savedUserName = localStorage.getItem("userName");
+    if (!savedUserName) {
       localStorage.removeItem("userName");
       localStorage.removeItem("quizAnswers");
       localStorage.removeItem("timeLeft");
       localStorage.removeItem("isQuizSubmitted");
-      router.push('/login');
-    };
+      router.push('/');
+      return;
+    }
 
-    // Clean up the interval on component unmount
-    return () => clearInterval(interval);
+    const savedAnswers = localStorage.getItem("quizAnswers");
+    const savedTime = localStorage.getItem("timeLeft");
+    const savedSubmitStatus = localStorage.getItem("isQuizSubmitted");
+
+    if (savedAnswers) {
+      try {
+        setAnswers(JSON.parse(savedAnswers));
+      } catch (error) {
+        console.error("Error parsing saved answers:", error);
+      }
+    }
+
+    if (savedTime) {
+      setTimeLeft(Number(savedTime));
+    } else {
+      const initialTime = 3600; // 1 hour in seconds
+      setTimeLeft(initialTime);
+      localStorage.setItem("timeLeft", initialTime.toString());
+    }
+
+    if (savedSubmitStatus) {
+      setIsQuizSubmitted(JSON.parse(savedSubmitStatus));
+    }
+  };
+
+  useEffect(() => {
+    loadSavedData();
+    fetchQuestions();
+  }, [router]);
+
+  useEffect(() => {
+    localStorage.setItem("quizAnswers", JSON.stringify(answers));
+  }, [answers]);
+
+  useEffect(() => {
+    if (timeLeft !== null) {
+      localStorage.setItem("timeLeft", timeLeft.toString());
+    }
+  }, [timeLeft]);
+
+  useEffect(() => {
+    if (isQuizSubmitted !== null) {
+      localStorage.setItem("isQuizSubmitted", JSON.stringify(isQuizSubmitted));
+    }
   }, [isQuizSubmitted]);
+  
+  // Timer untuk menghitung mundur
+  useEffect(() => {
+    if (timeLeft === null || timeLeft === undefined) return;
+  
+    const interval = setInterval(() => {
+      setTimeLeft((prevTime) => {
+        if (prevTime === null || prevTime === undefined || prevTime <= 0 || isQuizSubmitted) {
+          clearInterval(interval);
+          return prevTime;
+        }
+        const newTime = prevTime - 1;
+        localStorage.setItem("timeLeft", newTime.toString());
+        return newTime;
+      });
+    }, 1000);
+  
+    return () => clearInterval(interval);
+  }, [timeLeft, isQuizSubmitted]);  
 
   // Handle next question
   const handleNextQuestion = () => {
@@ -194,34 +181,31 @@ const QuizPage: NextPage = () => {
   };
 
   const handleSubmit = () => {
-    const unansweredIndices = []; // Array untuk menyimpan semua indeks yang belum terisi
-
-    // Cek jika ada jawaban yang belum terisi
+    const unansweredIndices = [];
+    
     for (let i = 0; i < questions.length; i++) {
       if (!answers[i]) {
-        unansweredIndices.push(i + 1); // Simpan indeks pertanyaan yang belum dijawab
+        unansweredIndices.push(i + 1);
       }
     }
 
     if (unansweredIndices.length > 0) {
-      // Tampilkan modal jika ada soal yang belum terisi
-      setUnansweredQuestionIndices(unansweredIndices); // Simpan semua indeks
-      setIsUnansweredModalOpen(true); // Tampilkan modal
-      return; // Jangan lanjutkan proses submit
+      setUnansweredQuestionIndices(unansweredIndices);
+      setIsUnansweredModalOpen(true);
+      return;
     }
-
-    // Jika semua jawaban sudah terisi, kunci jawaban dan hitung skor
+    
     setIsQuizSubmitted(true);
-
-    // Hitung skor
+    
     const score = Object.values(answers).filter(
       (answer, index) => answer === questions[index].correctAnswer
     ).length;
-
-    setFinalScore(score); // Simpan skor
+    
+    setFinalScore(score);
     localStorage.setItem("quizAnswers", JSON.stringify(answers));
     localStorage.setItem("finalScore", score.toString());
-    setIsScoreModalOpen(true); // Buka modal untuk menunjukkan skor
+    
+    router.push("/result");
   };
 
   return (
@@ -246,30 +230,10 @@ const QuizPage: NextPage = () => {
                 </button>
               ))}
             </div>
-            {/* Close button for mobile view */}
-            <button
-              className="md:hidden text-red-600 mt-4"
-              onClick={closeSidebar}
-            >
-              Close Sidebar
-            </button>
           </div>
         </div>
       )}
 
-      {/* Add a logout button */}
-      <button
-        className="absolute top-4 right-4 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
-        onClick={() => {
-          localStorage.removeItem("userName");
-          localStorage.removeItem("quizAnswers");
-          localStorage.removeItem("timeLeft");
-          localStorage.removeItem("isQuizSubmitted");
-          router.push('/login');
-        }}
-      >
-        Logout
-      </button>
       {/* Overlay for Sidebar (for mobile view) */}
       {isSidebarOpen && (
         <div
@@ -296,24 +260,34 @@ const QuizPage: NextPage = () => {
         >
           {isSidebarOpen ? "Close Menu" : "Open Menu"}
         </button>
-        <button
-          className="mb-4 bg-blue-600 text-white rounded-md p-2 hidden md:block"
-          onClick={toggleSidebar}
-        >
-          {isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
-        </button>
 
         {/* Header Section */}
         <div className="flex justify-between items-center bg-white p-4 rounded-md shadow-md">
           {/* Loading Message */}
-      {isLoading && (
-        <div className="flex items-center justify-center h-screen">
-          <h2 className="text-xl font-semibold">Sebentar, halaman sedang dimuat...</h2>
-        </div>
-      )}
-          <h1 className="text-lg md:text-xl font-semibold text-blue-600">
-            Basic Math Test
-          </h1>
+            {isLoading && (
+              <div className="absolute left-0 bottom-0 w-full h-screen bg-black opacity-70 flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <h2 className="text-xl font-semibold">loading</h2>
+              </div>
+            )}
+          <div className="flex items-center space-x-4">
+            <button className={`${isSidebarOpen ? "hidden" : "block"}`} onClick={toggleSidebar}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6 text-black">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+              </svg>
+            </button>
+            <button className={`${isSidebarOpen ? "block" : "hidden"}`} onClick={toggleSidebar}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6 text-black">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+              </svg>
+            </button>
+            <h1 className="text-lg md:text-xl font-semibold text-blue-600">
+              Quizzz
+            </h1>
+          </div>
           <div className="flex space-x-4 items-center">
             <div className="text-gray-600">
               <span className="font-medium">Time Left:</span>
@@ -347,6 +321,18 @@ const QuizPage: NextPage = () => {
                 ></div>
               </div>
             </div>
+            <button
+              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+              onClick={() => {
+                localStorage.removeItem("userName");
+                localStorage.removeItem("quizAnswers");
+                localStorage.removeItem("timeLeft");
+                localStorage.removeItem("isQuizSubmitted");
+                router.push('/');
+              }}
+            >
+              Exit
+            </button>
           </div>
         </div>
 
@@ -371,7 +357,7 @@ const QuizPage: NextPage = () => {
                 Next
               </button>
             ) : (
-              !isQuizSubmitted && ( // Pastikan tombol tidak ditampilkan jika quiz sudah disubmit
+              !isQuizSubmitted && (
                 <button
                   className="py-2 px-4 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition"
                   onClick={handleSubmit}
@@ -385,13 +371,13 @@ const QuizPage: NextPage = () => {
           {isUnansweredModalOpen && (
             <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
               <div className="bg-white rounded-lg p-6 shadow-lg">
-                <h2 className="text-lg font-bold mb-4">Perhatian</h2>
+                <h2 className="text-lg font-bold mb-4 text-black">Warning</h2>
                 <p className="text-gray-800 mb-4">
-                  Tidak bisa submit karena ada soal yang belum terisi:
+                  Cannot submit the quiz because there are unanswered questions
                 </p>
-                <ul className="list-disc list-inside mb-4">
+                <ul className="list-disc list-inside mb-4 text-black/60">
                   {unansweredQuestionIndices.map((index) => (
-                    <li key={index}>Soal nomor {index}</li>
+                    <li key={index}>Question number {index}</li>
                   ))}
                 </ul>
                 <div className="flex justify-end">
@@ -484,19 +470,19 @@ const QuizPage: NextPage = () => {
                   <label
                     key={option.value}
                     className={`flex items-center p-4 rounded-md cursor-pointer transition 
-        ${
-          isQuizSubmitted
-            ? // Setelah submit, tunjukkan warna hijau atau merah berdasarkan jawaban
-              option.label === questions[currentQuestionIndex].correctAnswer
-              ? "bg-green-200" // Hijau untuk jawaban benar
-              : answers[currentQuestionIndex] === option.label
-              ? "bg-red-200" // Merah untuk jawaban salah
-              : "bg-gray-100" // Default setelah submit
-            : // Sebelum submit, beri warna biru untuk opsi yang dipilih
-            answers[currentQuestionIndex] === option.label
-            ? "bg-blue-200" // Biru untuk opsi yang dipilih
-            : "bg-gray-100" // Default sebelum submit
-        }`}
+                  ${
+                    isQuizSubmitted
+                      ? // Setelah submit, tunjukkan warna hijau atau merah berdasarkan jawaban
+                        option.label === questions[currentQuestionIndex].correctAnswer
+                        ? "bg-green-200" // Hijau untuk jawaban benar
+                        : answers[currentQuestionIndex] === option.label
+                        ? "bg-red-200" // Merah untuk jawaban salah
+                        : "bg-gray-100" // Default setelah submit
+                      : // Sebelum submit, beri warna biru untuk opsi yang dipilih
+                      answers[currentQuestionIndex] === option.label
+                      ? "bg-blue-200" // Biru untuk opsi yang dipilih
+                      : "bg-gray-100" // Default sebelum submit
+                  }`}
                   >
                     <input
                       type="radio"
@@ -504,7 +490,7 @@ const QuizPage: NextPage = () => {
                       className="form-radio text-blue-600 h-5 w-5"
                       checked={answers[currentQuestionIndex] === option.label}
                       disabled={isQuizSubmitted}
-                      onClick={() => handleAnswerSelect(option.label)} // Pemilihan opsi berdasarkan label
+                      onChange={() => handleAnswerSelect(option.label)}
                     />
                     <span className="ml-3 text-gray-700">{option.value}</span>{" "}
                     {/* Tampilkan nilai dari opsi */}
@@ -513,35 +499,34 @@ const QuizPage: NextPage = () => {
               </div>
             </div>
             {isQuizSubmitted && (
-  <div className="md:w-1/3 mt-8 md:mt-0">
-    <h2 className="text-xl font-semibold mb-2">Your Answers:</h2>
-    <ul className="space-y-4">
-      {questions.map((question, index) => {
-        const isCorrect = answers[index] === question.correctAnswer;
+              <div className="md:w-1/3 mt-8 md:mt-0">
+                <h2 className="text-xl font-semibold mb-2">Your Answers:</h2>
+                <ul className="space-y-4">
+                  {questions.map((question, index) => {
+                    const isCorrect = answers[index] === question.correctAnswer;
 
-        return (
-          <li key={index} className="p-4 border border-gray-300 rounded-lg">
-            <p className="font-semibold">{`Question ${index + 1}`}</p>
-            <p
-              className={`mt-2 ${
-                isCorrect ? "text-green-600" : "text-red-600"
-              }`}
-            >
-              Your Answer: {answers[index] || "Not Answered"}
-            </p>
-            {!isCorrect && (
-              <p className="text-gray-600 mt-1">
-                Correct Answer: {question.correctAnswer}
-              </p>
+                    return (
+                      <li key={index} className="p-4 border border-gray-300 rounded-lg">
+                        <p className="font-semibold">{`Question ${index + 1}`}</p>
+                        <p
+                          className={`mt-2 ${
+                            isCorrect ? "text-green-600" : "text-red-600"
+                          }`}
+                        >
+                          Your Answer: {answers[index] || "Not Answered"}
+                        </p>
+                        {!isCorrect && (
+                          <p className="text-gray-600 mt-1">
+                            Correct Answer: {question.correctAnswer}
+                          </p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="mt-4">Your Score: {finalScore} out of {questions.length}</p>
+              </div>
             )}
-          </li>
-        );
-      })}
-    </ul>
-    <p className="mt-4">Your Score: {finalScore} out of {questions.length}</p>
-  </div>
-)}
-
           </div>
         </div>
       </div>
