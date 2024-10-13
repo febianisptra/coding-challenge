@@ -4,30 +4,30 @@ import { useState, useEffect } from "react";
 import { NextPage } from "next";
 import { useRouter } from "next/navigation"
 
+interface Question {
+  question: string;
+  options: { label: string; value: string }[];
+  correctAnswer: string;
+}
+
 const QuizPage: NextPage = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [answerStatus, setAnswerStatus] = useState<string | null>(null); // "correct" | "incorrect"
   const [answers, setAnswers] = useState<{ [key: number]: string | null }>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
   const [isUnansweredModalOpen, setIsUnansweredModalOpen] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
-  const [unansweredQuestionIndices, setUnansweredQuestionIndices] = useState<
-    number[]
-  >([]);
-  const [unansweredQuestionIndex, setUnansweredQuestionIndex] = useState<
-    number | null
-  >(null);
-  const [isQuizSubmitted, setIsQuizSubmitted] = useState(false); // Baru setelah submit dikunci jawabannya
+  const [unansweredQuestionIndices, setUnansweredQuestionIndices] = useState<number[]>([]);
+  const [isQuizSubmitted, setIsQuizSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const handleAnswerSelect = (selectedLabel: string) => {
-    setSelectedAnswer(selectedLabel);
+  const [loadingSubmit, setLoadingSubmit] = useState(false);
+  const router = useRouter();
 
+  const handleAnswerSelect = (selectedLabel: string) => {
     setAnswers((prevAnswers) => {
       const newAnswers = {
         ...prevAnswers,
@@ -36,13 +36,6 @@ const QuizPage: NextPage = () => {
       localStorage.setItem("quizAnswers", JSON.stringify(newAnswers));
       return newAnswers;
     });
-
-    const currentQuestion = questions[currentQuestionIndex];
-    if (currentQuestion && selectedLabel === currentQuestion.correctAnswer) {
-      setAnswerStatus("correct");
-    } else {
-      setAnswerStatus("incorrect");
-    }
   };
 
 
@@ -68,9 +61,6 @@ const QuizPage: NextPage = () => {
     }
   };
 
-  const [userName, setUserName] = useState<string | null>(null);
-  const router = useRouter();
-
   const loadSavedData = () => {
     const savedUserName = localStorage.getItem("userName");
     if (!savedUserName) {
@@ -88,7 +78,8 @@ const QuizPage: NextPage = () => {
 
     if (savedAnswers) {
       try {
-        setAnswers(JSON.parse(savedAnswers));
+        const parsedAnswers = JSON.parse(savedAnswers);
+        setAnswers(parsedAnswers);
       } catch (error) {
         console.error("Error parsing saved answers:", error);
       }
@@ -149,8 +140,6 @@ const QuizPage: NextPage = () => {
 
   // Handle next question
   const handleNextQuestion = () => {
-    setSelectedAnswer(null);
-    setAnswerStatus(null);
     setCurrentQuestionIndex((prevIndex) =>
       Math.min(prevIndex + 1, questions.length - 1)
     );
@@ -158,30 +147,17 @@ const QuizPage: NextPage = () => {
 
   // Handle previous question
   const handlePreviousQuestion = () => {
-    setSelectedAnswer(null);
-    setAnswerStatus(null);
     setCurrentQuestionIndex((prevIndex) => Math.max(prevIndex - 1, 0));
   };
 
   // Handle question selection from sidebar
   const handleSelectQuestion = (index: number) => {
     setCurrentQuestionIndex(index);
-    setSelectedAnswer(answers[index] || null); // Restore the selected answer for that question
-    setAnswerStatus(null); // Reset answer status
-  };
-
-  // Format waktu menjadi MM:SS
-  const formatTimeLeft = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(
-      2,
-      "0"
-    )}`;
   };
 
   const handleSubmit = () => {
     const unansweredIndices = [];
+    setLoadingSubmit(true)
     
     for (let i = 0; i < questions.length; i++) {
       if (!answers[i]) {
@@ -192,6 +168,7 @@ const QuizPage: NextPage = () => {
     if (unansweredIndices.length > 0) {
       setUnansweredQuestionIndices(unansweredIndices);
       setIsUnansweredModalOpen(true);
+      setLoadingSubmit(false)
       return;
     }
     
@@ -263,6 +240,15 @@ const QuizPage: NextPage = () => {
 
         {/* Header Section */}
         <div className="flex justify-between items-center bg-white p-4 rounded-md shadow-md">
+
+          <div className={`${loadingSubmit ? "absolute left-0 bottom-0 w-full h-screen bg-black opacity-70 flex items-center justify-center z-10" : "hidden"}`}>
+            <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <h2 className="text-xl font-semibold">loading</h2>
+          </div>
+
           {/* Loading Message */}
             {isLoading && (
               <div className="absolute left-0 bottom-0 w-full h-screen bg-black opacity-70 flex items-center justify-center">
@@ -290,17 +276,23 @@ const QuizPage: NextPage = () => {
           </div>
           <div className="flex space-x-4 items-center">
             <div className="text-gray-600">
-              <span className="font-medium">Time Left:</span>
-              <span className="ml-2 text-blue-600">{`${Math.floor(
-                timeLeft / 60
-              )}:${(timeLeft % 60).toString().padStart(2, "0")}`}</span>
-              {/* Progress Bar */}
-              <div className="w-full bg-gray-200 h-2 mt-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-blue-600 h-full rounded-full"
-                  style={{ width: `${(timeLeft / 3600) * 100}%` }}
-                ></div>
-              </div>
+              <span className="font-medium">Waktu Tersisa:</span>
+              {timeLeft !== null ? (
+                <>
+                  <span className="ml-2 text-blue-600">
+                    {`${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, "0")}`}
+                  </span>
+                  {/* Progress Bar */}
+                  <div className="w-full bg-gray-200 h-2 mt-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-blue-600 h-full rounded-full"
+                      style={{ width: `${(timeLeft / 3600) * 100}%` }}
+                    ></div>
+                  </div>
+                </>
+              ) : (
+                <span className="ml-2 text-blue-600">Memuat...</span>
+              )}
             </div>
             <div className="text-gray-600">
               <span className="font-medium">Question</span>
@@ -466,7 +458,7 @@ const QuizPage: NextPage = () => {
                 Select only one answer
               </h2>
               <div className="space-y-4">
-                {questions[currentQuestionIndex]?.options.map((option: any) => (
+                {questions[currentQuestionIndex]?.options.map((option: { label: string; value: string }) => (
                   <label
                     key={option.value}
                     className={`flex items-center p-4 rounded-md cursor-pointer transition 

@@ -3,13 +3,21 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+interface Question {
+    question: string;
+    options: { label: string; value: string }[];
+    correctAnswer: string;
+  }
+
 const ResultPage = () => {
   const [answers, setAnswers] = useState<{ [key: number]: string | null }>({});
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [correctCount, setCorrectCount] = useState(0);
   const router = useRouter();
 
-  const savedUserName = localStorage.getItem("userName");
+  useEffect(() => {
+    const savedUserName = localStorage.getItem("userName");
     if (!savedUserName) {
         localStorage.removeItem("userName");
         localStorage.removeItem("quizAnswers");
@@ -18,8 +26,8 @@ const ResultPage = () => {
         router.push('/');
         return;
     }
+    setUserName(savedUserName);
 
-  useEffect(() => {
     const savedAnswers = localStorage.getItem("quizAnswers");
     const fetchQuestions = async () => {
       const response = await fetch(
@@ -33,8 +41,8 @@ const ResultPage = () => {
       setAnswers(JSON.parse(savedAnswers));
     }
     fetchQuestions();
-  }, []);
-  
+  }, [router]);
+
   useEffect(() => {
     if (questions.length > 0 && Object.keys(answers).length > 0) {
       const correct = Object.entries(answers).reduce((acc, [index, answer]) => {
@@ -52,17 +60,21 @@ const ResultPage = () => {
     router.push("/");
   };
 
-  const getAnswerValue = (question: any, answerLabel: string | null) => {
+  const getAnswerValue = (question: Question, answerLabel: string | null) => {
     if (!answerLabel) return "Tidak ada jawaban";
-    const option = question.options.find((opt: any) => opt.label === answerLabel);
+    const option = question.options.find((opt) => opt.label === answerLabel);
     return option ? option.value : "Jawaban tidak ditemukan";
   };
+
+  if (!userName) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 py-10">
         <h1 className="text-2xl font-bold mb-4 text-black">Quiz Results</h1>
         <div className="w-full max-w-3xl flex items-center justify-between">
-            <p className="text-sm text-black/80 font-medium mt-2">Name: {savedUserName}</p>
+            <p className="text-sm text-black/80 font-medium mt-2">Name: {userName}</p>
             <p className="text-sm text-black/80 font-medium">Skor: {correctCount} / {questions.length}</p>
         </div>
       <div className="w-full max-w-3xl p-4 bg-white shadow-md rounded-md">
